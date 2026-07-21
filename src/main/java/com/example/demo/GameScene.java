@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import com.example.demo.engine.GameEngine;
+import com.example.demo.engine.TileSpawner;
 import com.example.demo.model.Board;
 import com.example.demo.model.Direction;
 import com.example.demo.model.MoveResult;
@@ -11,10 +12,9 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
+/**
+ * Connects the JavaFX game interface to the independent game engine.
+ */
 class GameScene {
 
     private static final int HEIGHT = 700;
@@ -29,7 +29,8 @@ class GameScene {
     private final TextMaker textMaker =
             TextMaker.getSingleInstance();
 
-    private final Random random = new Random();
+    private final TileSpawner tileSpawner =
+            new TileSpawner();
 
     private Board board;
     private GameEngine gameEngine;
@@ -49,51 +50,21 @@ class GameScene {
         return LENGTH;
     }
 
+    /**
+     * Creates a new empty board and places the first two tiles.
+     */
     private void initialiseGame() {
         board = new Board(n);
         gameEngine = new GameEngine(board);
         score = 0;
 
-        spawnRandomTile();
-        spawnRandomTile();
+        tileSpawner.spawn(board);
+        tileSpawner.spawn(board);
     }
 
-    private boolean spawnRandomTile() {
-        List<int[]> emptyPositions = new ArrayList<>();
-
-        for (int row = 0; row < board.getSize(); row++) {
-            for (int column = 0;
-                 column < board.getSize();
-                 column++) {
-
-                if (board.isEmpty(row, column)) {
-                    emptyPositions.add(
-                            new int[]{row, column}
-                    );
-                }
-            }
-        }
-
-        if (emptyPositions.isEmpty()) {
-            return false;
-        }
-
-        int[] selectedPosition =
-                emptyPositions.get(
-                        random.nextInt(emptyPositions.size())
-                );
-
-        int value = random.nextInt(10) == 0 ? 4 : 2;
-
-        board.setValue(
-                selectedPosition[0],
-                selectedPosition[1],
-                value
-        );
-
-        return true;
-    }
-
+    /**
+     * Recreates the visible board from the numerical board model.
+     */
     private void renderBoard() {
         boardRoot.getChildren().clear();
 
@@ -137,6 +108,12 @@ class GameScene {
         }
     }
 
+    /**
+     * Converts a JavaFX key code to a game direction.
+     *
+     * @param keyCode pressed keyboard key
+     * @return movement direction, or null for a non-direction key
+     */
     private Direction convertDirection(KeyCode keyCode) {
         return switch (keyCode) {
             case UP -> Direction.UP;
@@ -147,6 +124,9 @@ class GameScene {
         };
     }
 
+    /**
+     * Displays the existing end-game scene.
+     */
     private void showEndGame(
             Scene endGameScene,
             Group endGameRoot,
@@ -191,10 +171,18 @@ class GameScene {
         initialiseGame();
         renderBoard();
 
+        /*
+         * setOnKeyPressed replaces the previous handler instead of
+         * adding another handler whenever a new game is started.
+         */
         gameScene.setOnKeyPressed(keyEvent -> {
             Direction direction =
                     convertDirection(keyEvent.getCode());
 
+            /*
+             * Ignore letters, Space, Enter and all other
+             * non-direction keys.
+             */
             if (direction == null) {
                 return;
             }
@@ -202,6 +190,10 @@ class GameScene {
             MoveResult moveResult =
                     gameEngine.move(direction);
 
+            /*
+             * Do not change the score or generate a tile when
+             * the attempted move did not change the board.
+             */
             if (!moveResult.moved()) {
                 return;
             }
@@ -209,7 +201,7 @@ class GameScene {
             score += moveResult.scoreGained();
             scoreText.setText(Long.toString(score));
 
-            spawnRandomTile();
+            tileSpawner.spawn(board);
             renderBoard();
 
             if (gameEngine.isGameOver()) {
