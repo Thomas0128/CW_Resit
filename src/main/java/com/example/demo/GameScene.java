@@ -2,18 +2,21 @@ package com.example.demo;
 
 import com.example.demo.engine.GameEngine;
 import com.example.demo.engine.TileSpawner;
+import com.example.demo.history.GameHistory;
 import com.example.demo.model.Board;
 import com.example.demo.model.Direction;
+import com.example.demo.model.GameState;
 import com.example.demo.model.MoveResult;
 import javafx.scene.Group;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.input.KeyCode;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
 /**
- * Connects the JavaFX game interface to the independent game engine.
+ * Connects the JavaFX game interface to the independent game engine
  */
 class GameScene {
 
@@ -31,6 +34,9 @@ class GameScene {
 
     private final TileSpawner tileSpawner =
             new TileSpawner();
+
+    private final GameHistory gameHistory =
+            new GameHistory();
 
     private Board board;
     private GameEngine gameEngine;
@@ -51,19 +57,21 @@ class GameScene {
     }
 
     /**
-     * Creates a new empty board and places the first two tiles.
+     * Creates a new empty board and places the first two tiles
      */
     private void initialiseGame() {
         board = new Board(n);
         gameEngine = new GameEngine(board);
         score = 0;
 
+        gameHistory.clear();
+
         tileSpawner.spawn(board);
         tileSpawner.spawn(board);
     }
 
     /**
-     * Recreates the visible board from the numerical board model.
+     * Recreates the visible board from the numerical board model
      */
     private void renderBoard() {
         boardRoot.getChildren().clear();
@@ -109,7 +117,7 @@ class GameScene {
     }
 
     /**
-     * Converts a JavaFX key code to a game direction.
+     * Converts a JavaFX key code to a game direction
      *
      * @param keyCode pressed keyboard key
      * @return movement direction, or null for a non-direction key
@@ -125,7 +133,29 @@ class GameScene {
     }
 
     /**
-     * Displays the existing end-game scene.
+     * Restores the most recently saved board and score
+     *
+     * @param scoreText visible score display
+     * @param undoButton Undo button
+     */
+    private void undoLastMove(
+            Text scoreText,
+            Button undoButton
+    ) {
+        gameHistory.undo().ifPresent(savedState -> {
+            board = savedState.board();
+            gameEngine = new GameEngine(board);
+            score = savedState.score();
+
+            scoreText.setText(Long.toString(score));
+            renderBoard();
+        });
+
+        undoButton.setDisable(!gameHistory.canUndo());
+    }
+
+    /**
+     * Displays the existing end-game scene
      */
     private void showEndGame(
             Scene endGameScene,
@@ -143,6 +173,7 @@ class GameScene {
         );
 
         root.getChildren().clear();
+        gameHistory.clear();
         score = 0;
     }
 
@@ -168,12 +199,24 @@ class GameScene {
         scoreText.relocate(750, 150);
         root.getChildren().add(scoreText);
 
+        Button undoButton = new Button("Undo");
+        undoButton.setLayoutX(735);
+        undoButton.setLayoutY(210);
+        undoButton.setPrefWidth(110);
+        undoButton.setDisable(true);
+        undoButton.setFocusTraversable(false);
+        root.getChildren().add(undoButton);
+
         initialiseGame();
         renderBoard();
 
+        undoButton.setOnAction(event ->
+                undoLastMove(scoreText, undoButton)
+        );
+
         /*
          * setOnKeyPressed replaces the previous handler instead of
-         * adding another handler whenever a new game is started.
+         * adding another handler whenever a new game is started
          */
         gameScene.setOnKeyPressed(keyEvent -> {
             Direction direction =
@@ -187,16 +230,25 @@ class GameScene {
                 return;
             }
 
+            /*
+             * Capture the board and score before attempting the move
+             * The snapshot is only saved if the move is valid
+             */
+            GameState previousState =
+                    new GameState(board, score);
+
             MoveResult moveResult =
                     gameEngine.move(direction);
 
             /*
-             * Do not change the score or generate a tile when
-             * the attempted move did not change the board.
+             * Invalid moves are not added to the Undo history
              */
             if (!moveResult.moved()) {
                 return;
             }
+
+            gameHistory.save(previousState);
+            undoButton.setDisable(false);
 
             score += moveResult.scoreGained();
             scoreText.setText(Long.toString(score));
