@@ -6,5 +6,7 @@ module com.example.demo {
     exports com.example.demo;
     exports com.example.demo.model;
     exports com.example.demo.engine;
+    exports com.example.demo.history;
+
 
 }
