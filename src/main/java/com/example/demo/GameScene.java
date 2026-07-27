@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import com.example.demo.ai.HintService;
 import com.example.demo.engine.GameEngine;
 import com.example.demo.engine.TileSpawner;
 import com.example.demo.history.GameHistory;
@@ -16,7 +17,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
 /**
- * Connects the JavaFX game interface to the independent game engine
+ * Connects the JavaFX game interface to the independent game engine.
  */
 class GameScene {
 
@@ -38,6 +39,9 @@ class GameScene {
     private final GameHistory gameHistory =
             new GameHistory();
 
+    private final HintService hintService =
+            new HintService();
+
     private Board board;
     private GameEngine gameEngine;
     private Group boardRoot;
@@ -57,7 +61,7 @@ class GameScene {
     }
 
     /**
-     * Creates a new empty board and places the first two tiles
+     * Creates a new empty board and places the first two tiles.
      */
     private void initialiseGame() {
         board = new Board(n);
@@ -71,7 +75,7 @@ class GameScene {
     }
 
     /**
-     * Recreates the visible board from the numerical board model
+     * Recreates the visible board from the numerical board model.
      */
     private void renderBoard() {
         boardRoot.getChildren().clear();
@@ -117,7 +121,7 @@ class GameScene {
     }
 
     /**
-     * Converts a JavaFX key code to a game direction
+     * Converts a JavaFX key code to a game direction.
      *
      * @param keyCode pressed keyboard key
      * @return movement direction, or null for a non-direction key
@@ -133,14 +137,16 @@ class GameScene {
     }
 
     /**
-     * Restores the most recently saved board and score
+     * Restores the most recently saved board and score.
      *
      * @param scoreText visible score display
      * @param undoButton Undo button
+     * @param hintText visible hint display
      */
     private void undoLastMove(
             Text scoreText,
-            Button undoButton
+            Button undoButton,
+            Text hintText
     ) {
         gameHistory.undo().ifPresent(savedState -> {
             board = savedState.board();
@@ -148,6 +154,7 @@ class GameScene {
             score = savedState.score();
 
             scoreText.setText(Long.toString(score));
+            hintText.setText("Hint: -");
             renderBoard();
         });
 
@@ -155,7 +162,7 @@ class GameScene {
     }
 
     /**
-     * Displays the existing end-game scene
+     * Displays the existing end-game scene.
      */
     private void showEndGame(
             Scene endGameScene,
@@ -207,16 +214,46 @@ class GameScene {
         undoButton.setFocusTraversable(false);
         root.getChildren().add(undoButton);
 
+        Button hintButton = new Button("Hint");
+        hintButton.setLayoutX(735);
+        hintButton.setLayoutY(260);
+        hintButton.setPrefWidth(110);
+        hintButton.setFocusTraversable(false);
+        root.getChildren().add(hintButton);
+
+        Text hintText = new Text("Hint: -");
+        hintText.setFont(Font.font(18));
+        hintText.relocate(720, 320);
+        root.getChildren().add(hintText);
+
         initialiseGame();
         renderBoard();
 
         undoButton.setOnAction(event ->
-                undoLastMove(scoreText, undoButton)
+                undoLastMove(
+                        scoreText,
+                        undoButton,
+                        hintText
+                )
+        );
+
+        hintButton.setOnAction(event ->
+                hintService.suggestMove(board)
+                        .ifPresentOrElse(
+                                direction ->
+                                        hintText.setText(
+                                                "Hint: " + direction
+                                        ),
+                                () ->
+                                        hintText.setText(
+                                                "No valid move"
+                                        )
+                        )
         );
 
         /*
          * setOnKeyPressed replaces the previous handler instead of
-         * adding another handler whenever a new game is started
+         * adding another handler whenever a new game is started.
          */
         gameScene.setOnKeyPressed(keyEvent -> {
             Direction direction =
@@ -231,8 +268,8 @@ class GameScene {
             }
 
             /*
-             * Capture the board and score before attempting the move
-             * The snapshot is only saved if the move is valid
+             * Capture the board and score before attempting the move.
+             * The snapshot is only saved if the move is valid.
              */
             GameState previousState =
                     new GameState(board, score);
@@ -241,7 +278,7 @@ class GameScene {
                     gameEngine.move(direction);
 
             /*
-             * Invalid moves are not added to the Undo history
+             * Invalid moves are not added to the Undo history.
              */
             if (!moveResult.moved()) {
                 return;
@@ -249,6 +286,7 @@ class GameScene {
 
             gameHistory.save(previousState);
             undoButton.setDisable(false);
+            hintText.setText("Hint: -");
 
             score += moveResult.scoreGained();
             scoreText.setText(Long.toString(score));
