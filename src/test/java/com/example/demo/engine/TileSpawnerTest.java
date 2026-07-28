@@ -2,7 +2,9 @@ package com.example.demo.engine;
 
 import com.example.demo.model.Board;
 import org.junit.jupiter.api.Test;
+import com.example.demo.model.Position;
 
+import java.util.List;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -90,6 +92,30 @@ class TileSpawnerTest {
 
         assertEquals(2, board.getValue(0, 0));
     }
+    @Test
+    void spawnNeverUsesObstaclePosition() {
+        Board board = new Board(
+                2,
+                List.of(
+                        new Position(0, 0),
+                        new Position(0, 1),
+                        new Position(1, 0)
+                )
+        );
+
+        TileSpawner spawner =
+                new TileSpawner(
+                        new SequenceRandom(0, 5)
+                );
+
+        boolean spawned = spawner.spawn(board);
+
+        assertTrue(spawned);
+        assertEquals(2, board.getValue(1, 1));
+        assertEquals(0, board.getValue(0, 0));
+        assertTrue(board.isFull());
+    }
+
 
     /**
      * Predictable random-number generator used only by these tests.

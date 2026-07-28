@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import com.example.demo.model.Position;
 
 
     public final class TileSpawner {
@@ -49,26 +50,31 @@ import java.util.Random;
         return true;
     }
 
-    private List<Position> findEmptyPositions(Board board) {
-        List<Position> emptyPositions = new ArrayList<>();
+        private List<Position> findEmptyPositions(
+                Board board
+        ) {
+            List<Position> emptyPositions =
+                    new ArrayList<>();
 
-        for (int row = 0; row < board.getSize(); row++) {
-            for (int column = 0;
-                 column < board.getSize();
-                 column++) {
+            for (int row = 0;
+                 row < board.getSize();
+                 row++) {
 
-                if (board.isEmpty(row, column)) {
-                    emptyPositions.add(
-                            new Position(row, column)
-                    );
+                for (int column = 0;
+                     column < board.getSize();
+                     column++) {
+
+                    if (board.isEmpty(row, column)) {
+                        emptyPositions.add(
+                                new Position(row, column)
+                        );
+                    }
                 }
             }
+
+            return emptyPositions;
         }
 
-        return emptyPositions;
-    }
 
 
-    private record Position(int row, int column) {
-    }
 }
