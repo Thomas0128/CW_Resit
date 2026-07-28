@@ -70,6 +70,9 @@ public class Main extends Application {
                         menuScene
                 );
 
+        Text classicDescription =
+                new Text("Classic target: 2048");
+
         Button largeBoardButton =
                 createLevelButton(
                         "Large Board — 5 × 5",
@@ -83,11 +86,24 @@ public class Main extends Application {
                         menuScene
                 );
 
-        Text classicDescription =
-                new Text("Classic target: 2048");
-
         Text largeBoardDescription =
                 new Text("Large Board target: 4096");
+
+        Button obstacleButton =
+                createLevelButton(
+                        "Obstacle Challenge — 4 × 4",
+                        LevelCatalog.OBSTACLE_CHALLENGE,
+                        game,
+                        gameScene,
+                        gameRoot,
+                        primaryStage,
+                        endGameScene,
+                        endGameRoot,
+                        menuScene
+                );
+
+        Text obstacleDescription =
+                new Text("Two blocked cells | Target: 1024");
 
         Text controls =
                 new Text(
@@ -97,19 +113,21 @@ public class Main extends Application {
                 );
 
         VBox menuBox = new VBox(
-                18,
+                14,
                 title,
                 menuMessage,
                 classicButton,
                 classicDescription,
                 largeBoardButton,
                 largeBoardDescription,
+                obstacleButton,
+                obstacleDescription,
                 controls
         );
 
         menuBox.setAlignment(Pos.CENTER);
         menuBox.setPrefWidth(WIDTH);
-        menuBox.setLayoutY(160);
+        menuBox.setLayoutY(90);
 
         menuRoot.getChildren().add(menuBox);
 
