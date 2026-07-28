@@ -56,6 +56,7 @@ public final class HintService {
              * possible moves are being evaluated.
              */
             Board simulatedBoard = board.copy();
+
             GameEngine simulatedEngine =
                     new GameEngine(simulatedBoard);
 
@@ -82,26 +83,36 @@ public final class HintService {
 
     /**
      * Calculates a heuristic score for a simulated board.
+     *
+     * <p>Obstacle cells are ignored when locating the maximum
+     * tile. The board model supplies the number of usable empty
+     * cells, so obstacle positions are not incorrectly rewarded
+     * as empty spaces.</p>
      */
     private long evaluateBoard(
             Board board,
             int scoreGained
     ) {
-        int emptyCells = 0;
+        int emptyCells = board.countEmptyCells();
+
         int maximumTile = 0;
         int maximumRow = 0;
         int maximumColumn = 0;
 
-        for (int row = 0; row < board.getSize(); row++) {
+        for (int row = 0;
+             row < board.getSize();
+             row++) {
+
             for (int column = 0;
                  column < board.getSize();
                  column++) {
 
-                int value = board.getValue(row, column);
-
-                if (value == 0) {
-                    emptyCells++;
+                if (board.isObstacle(row, column)) {
+                    continue;
                 }
+
+                int value =
+                        board.getValue(row, column);
 
                 if (value > maximumTile) {
                     maximumTile = value;
@@ -117,11 +128,13 @@ public final class HintService {
                         * MERGE_SCORE_WEIGHT
                         + maximumTile;
 
-        if (isCorner(
+        if (maximumTile > 0
+                && isCorner(
                 maximumRow,
                 maximumColumn,
                 board.getSize()
         )) {
+
             evaluation +=
                     (long) maximumTile * CORNER_WEIGHT;
         }
@@ -138,10 +151,12 @@ public final class HintService {
             int boardSize
     ) {
         boolean edgeRow =
-                row == 0 || row == boardSize - 1;
+                row == 0
+                        || row == boardSize - 1;
 
         boolean edgeColumn =
-                column == 0 || column == boardSize - 1;
+                column == 0
+                        || column == boardSize - 1;
 
         return edgeRow && edgeColumn;
     }
