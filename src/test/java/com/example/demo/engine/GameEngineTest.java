@@ -3,12 +3,16 @@ package com.example.demo.engine;
 import com.example.demo.model.Board;
 import com.example.demo.model.Direction;
 import com.example.demo.model.MoveResult;
+import com.example.demo.model.Position;
+
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 
 /**
  * Unit tests for the movement and state rules of {@link GameEngine}.
@@ -30,6 +34,7 @@ class GameEngineTest {
 
         assertTrue(result.moved());
         assertEquals(8, result.scoreGained());
+
 
         assertBoardEquals(new int[][]{
                 {4, 4, 0, 0},
@@ -169,6 +174,138 @@ class GameEngineTest {
 
         assertTrue(engine.hasReachedTarget(2048));
         assertFalse(engine.hasReachedTarget(4096));
+    }
+    @Test
+    void obstaclePreventsTilesFromCrossingOrMerging() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 0, 0, 2},
+                        {0, 0, 0, 0},
+                        {0, 0, 0, 0},
+                        {0, 0, 0, 0}
+                },
+                List.of(new Position(0, 1))
+        );
+
+        GameEngine engine = new GameEngine(board);
+
+        MoveResult result =
+                engine.move(Direction.LEFT);
+
+        assertTrue(result.moved());
+        assertEquals(0, result.scoreGained());
+        assertTrue(board.isObstacle(0, 1));
+
+        assertBoardEquals(new int[][]{
+                {2, 0, 2, 0},
+                {0, 0, 0, 0},
+                {0, 0, 0, 0},
+                {0, 0, 0, 0}
+        }, board);
+    }
+
+    @Test
+    void tilesMergeIndependentlyInsideObstacleSegments() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 2, 0, 4, 4},
+                        {0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0}
+                },
+                List.of(new Position(0, 2))
+        );
+
+        GameEngine engine = new GameEngine(board);
+
+        MoveResult result =
+                engine.move(Direction.LEFT);
+
+        assertTrue(result.moved());
+        assertEquals(12, result.scoreGained());
+        assertTrue(board.isObstacle(0, 2));
+
+        assertBoardEquals(new int[][]{
+                {4, 0, 0, 8, 0},
+                {0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0}
+        }, board);
+    }
+
+    @Test
+    void obstacleStopsVerticalMovement() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 0, 0, 0},
+                        {0, 0, 0, 0},
+                        {0, 0, 0, 0},
+                        {2, 0, 0, 0}
+                },
+                List.of(new Position(1, 0))
+        );
+
+        GameEngine engine = new GameEngine(board);
+
+        MoveResult result =
+                engine.move(Direction.UP);
+
+        assertTrue(result.moved());
+        assertEquals(0, result.scoreGained());
+        assertTrue(board.isObstacle(1, 0));
+
+        assertBoardEquals(new int[][]{
+                {2, 0, 0, 0},
+                {0, 0, 0, 0},
+                {2, 0, 0, 0},
+                {0, 0, 0, 0}
+        }, board);
+    }
+
+    @Test
+    void adjacentObstaclesDoNotCreateFalseAvailableMove() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 0},
+                        {0, 4}
+                },
+                List.of(
+                        new Position(0, 1),
+                        new Position(1, 0)
+                )
+        );
+
+        GameEngine engine = new GameEngine(board);
+
+        assertFalse(engine.canMove());
+        assertTrue(engine.isGameOver());
+    }
+
+    @Test
+    void isolatedEmptyCellDoesNotMeanMovementIsPossible() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 0, 4},
+                        {0, 0, 0},
+                        {8, 0, 16}
+                },
+                List.of(
+                        new Position(0, 1),
+                        new Position(1, 0),
+                        new Position(1, 2),
+                        new Position(2, 1)
+                )
+        );
+
+        GameEngine engine = new GameEngine(board);
+
+        assertEquals(1, board.countEmptyCells());
+        assertFalse(board.isFull());
+
+        assertFalse(engine.canMove());
+        assertTrue(engine.isGameOver());
     }
 
     private static void assertBoardEquals(

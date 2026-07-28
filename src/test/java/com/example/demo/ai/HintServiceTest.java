@@ -4,13 +4,15 @@ import com.example.demo.engine.GameEngine;
 import com.example.demo.model.Board;
 import com.example.demo.model.Direction;
 import com.example.demo.model.MoveResult;
-import org.junit.jupiter.api.Test;
+import com.example.demo.model.Position;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the heuristic AI hint service
@@ -96,5 +98,51 @@ class HintServiceTest {
                         .move(suggestion);
 
         assertTrue(result.moved());
+
     }
+    @Test
+    void obstacleBoardSuggestionProducesValidMove() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 0, 0, 2},
+                        {4, 8, 16, 32},
+                        {64, 128, 256, 512},
+                        {2, 4, 8, 16}
+                },
+                List.of(new Position(0, 1))
+        );
+
+        Direction suggestion =
+                hintService.suggestMove(board)
+                        .orElseThrow();
+
+        Board simulation = board.copy();
+
+        MoveResult result =
+                new GameEngine(simulation)
+                        .move(suggestion);
+
+        assertTrue(result.moved());
+        assertTrue(simulation.isObstacle(0, 1));
+    }
+
+    @Test
+    void returnsEmptyWhenObstaclesIsolateAllTiles() {
+        Board board = new Board(
+                new int[][]{
+                        {2, 0},
+                        {0, 4}
+                },
+                List.of(
+                        new Position(0, 1),
+                        new Position(1, 0)
+                )
+        );
+
+        Optional<Direction> suggestion =
+                hintService.suggestMove(board);
+
+        assertTrue(suggestion.isEmpty());
+    }
+
 }
