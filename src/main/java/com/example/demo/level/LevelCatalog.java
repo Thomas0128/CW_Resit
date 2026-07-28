@@ -1,5 +1,7 @@
 package com.example.demo.level;
 
+import com.example.demo.model.Position;
+
 import java.util.List;
 
 /**
@@ -29,6 +31,21 @@ public final class LevelCatalog {
                     2
             );
 
+    /**
+     * A 4 × 4 challenge containing two blocked cells
+     */
+    public static final LevelConfig OBSTACLE_CHALLENGE =
+            new LevelConfig(
+                    "Obstacle Challenge",
+                    4,
+                    1024,
+                    2,
+                    List.of(
+                            new Position(1, 1),
+                            new Position(2, 2)
+                    )
+            );
+
     private LevelCatalog() {
         // Utility class.
     }
@@ -41,7 +58,8 @@ public final class LevelCatalog {
     public static List<LevelConfig> playableLevels() {
         return List.of(
                 CLASSIC,
-                LARGE_BOARD
+                LARGE_BOARD,
+                OBSTACLE_CHALLENGE
         );
     }
 }
