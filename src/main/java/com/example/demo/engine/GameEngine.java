@@ -3,6 +3,7 @@ package com.example.demo.engine;
 import com.example.demo.model.Board;
 import com.example.demo.model.Direction;
 import com.example.demo.model.MoveResult;
+import com.example.demo.model.Position;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -10,15 +11,15 @@ import java.util.Objects;
 /**
  * Performs the movement and merging rules of the 2048 game
  *
- * <p>This class contains no JavaFX code, allowing the game rules to be
- * tested independently from the user interface</p>
+ * <p>Obstacle cells divide rows and columns into independent segments
+ * Tiles can move and merge only inside their own segment
  */
 public final class GameEngine {
 
     private final Board board;
 
     /**
-     * Creates an engine that operates on the supplied board
+     * Creates an engine for the supplied board
      *
      * @param board board controlled by this engine
      */
@@ -39,13 +40,14 @@ public final class GameEngine {
     }
 
     /**
-     * Moves and merges all tiles in the requested direction
+     * Moves and merges tiles in the requested direction
      *
-     * <p>Each tile may merge only once during a move. The returned score
-     * is the sum of the newly created tile values.</p>
+     * <p>Each obstacle divides a row or column into separate playable
+     * segments. Tiles cannot move through an obstacle or merge with
+     * tiles on the opposite side of an obstacle
      *
-     * @param direction direction in which tiles should move
-     * @return result describing whether the board changed and the score gained
+     * @param direction movement direction
+     * @return movement result and score gained
      */
     public MoveResult move(Direction direction) {
         Objects.requireNonNull(
@@ -56,51 +58,48 @@ public final class GameEngine {
         boolean moved = false;
         int totalScoreGained = 0;
 
-        for (int index = 0; index < board.getSize(); index++) {
-            int[] originalLine = readLine(index, direction);
-            LineResult lineResult = mergeLine(originalLine);
-            int[] updatedLine = lineResult.values();
+        for (int lineIndex = 0;
+             lineIndex < board.getSize();
+             lineIndex++) {
 
-            if (!Arrays.equals(originalLine, updatedLine)) {
-                moved = true;
-            }
+            SegmentResult result =
+                    processLine(lineIndex, direction);
 
-            writeLine(index, direction, updatedLine);
-            totalScoreGained += lineResult.scoreGained();
+            moved |= result.moved();
+            totalScoreGained += result.scoreGained();
         }
 
         if (!moved) {
             return MoveResult.noMove();
         }
 
-        return new MoveResult(true, totalScoreGained);
+        return new MoveResult(
+                true,
+                totalScoreGained
+        );
     }
 
     /**
      * Determines whether at least one valid move remains
      *
-     * @return true when a tile can move or merge
+     * <p>The four directions are simulated on independent board copies
+     * This keeps movement validation consistent with the real movement
+     * rules, including obstacle boundaries
+     *
+     * @return true when at least one direction changes the board
      */
     public boolean canMove() {
-        if (!board.isFull()) {
-            return true;
-        }
+        for (Direction direction : Direction.values()) {
+            Board simulatedBoard = board.copy();
 
-        int size = board.getSize();
+            GameEngine simulatedEngine =
+                    new GameEngine(simulatedBoard);
 
-        for (int row = 0; row < size; row++) {
-            for (int column = 0; column < size; column++) {
-                int value = board.getValue(row, column);
+            MoveResult result =
+                    simulatedEngine.move(direction);
 
-                if (column + 1 < size
-                        && value == board.getValue(row, column + 1)) {
-                    return true;
-                }
-
-                if (row + 1 < size
-                        && value == board.getValue(row + 1, column)) {
-                    return true;
-                }
+            if (result.moved()) {
+                return true;
             }
         }
 
@@ -127,66 +126,214 @@ public final class GameEngine {
         return board.contains(target);
     }
 
-    private int[] readLine(int index, Direction direction) {
+    /**
+     * Processes all playable segments in one row or column
+     */
+    private SegmentResult processLine(
+            int lineIndex,
+            Direction direction
+    ) {
+        boolean moved = false;
+        int scoreGained = 0;
+        int offset = 0;
         int size = board.getSize();
-        int[] values = new int[size];
 
-        for (int offset = 0; offset < size; offset++) {
-            values[offset] = switch (direction) {
-                case LEFT -> board.getValue(index, offset);
-                case RIGHT -> board.getValue(index, size - 1 - offset);
-                case UP -> board.getValue(offset, index);
-                case DOWN -> board.getValue(size - 1 - offset, index);
-            };
+        while (offset < size) {
+
+            // Skip obstacle cells.
+            while (offset < size
+                    && isObstacleAt(
+                    lineIndex,
+                    offset,
+                    direction
+            )) {
+
+                offset++;
+            }
+
+            if (offset >= size) {
+                break;
+            }
+
+            int segmentStart = offset;
+
+            // Locate the end of this playable segment.
+            while (offset < size
+                    && !isObstacleAt(
+                    lineIndex,
+                    offset,
+                    direction
+            )) {
+
+                offset++;
+            }
+
+            int segmentEnd = offset;
+
+            int[] originalValues =
+                    readSegment(
+                            lineIndex,
+                            segmentStart,
+                            segmentEnd,
+                            direction
+                    );
+
+            LineResult mergedResult =
+                    mergeLine(originalValues);
+
+            if (!Arrays.equals(
+                    originalValues,
+                    mergedResult.values()
+            )) {
+                moved = true;
+            }
+
+            writeSegment(
+                    lineIndex,
+                    segmentStart,
+                    direction,
+                    mergedResult.values()
+            );
+
+            scoreGained +=
+                    mergedResult.scoreGained();
+        }
+
+        return new SegmentResult(
+                moved,
+                scoreGained
+        );
+    }
+
+    /**
+     * Reads one playable segment in movement order
+     */
+    private int[] readSegment(
+            int lineIndex,
+            int segmentStart,
+            int segmentEnd,
+            Direction direction
+    ) {
+        int[] values =
+                new int[segmentEnd - segmentStart];
+
+        for (int index = 0;
+             index < values.length;
+             index++) {
+
+            Position position =
+                    positionAt(
+                            lineIndex,
+                            segmentStart + index,
+                            direction
+                    );
+
+            values[index] = board.getValue(
+                    position.row(),
+                    position.column()
+            );
         }
 
         return values;
     }
 
-    private void writeLine(
-            int index,
+    /**
+     * Writes a processed segment back without touching obstacles
+     */
+    private void writeSegment(
+            int lineIndex,
+            int segmentStart,
             Direction direction,
             int[] values
     ) {
-        int size = board.getSize();
+        for (int index = 0;
+             index < values.length;
+             index++) {
 
-        for (int offset = 0; offset < size; offset++) {
-            switch (direction) {
-                case LEFT ->
-                        board.setValue(index, offset, values[offset]);
+            Position position =
+                    positionAt(
+                            lineIndex,
+                            segmentStart + index,
+                            direction
+                    );
 
-                case RIGHT ->
-                        board.setValue(
-                                index,
-                                size - 1 - offset,
-                                values[offset]
-                        );
-
-                case UP ->
-                        board.setValue(offset, index, values[offset]);
-
-                case DOWN ->
-                        board.setValue(
-                                size - 1 - offset,
-                                index,
-                                values[offset]
-                        );
-            }
+            board.setValue(
+                    position.row(),
+                    position.column(),
+                    values[index]
+            );
         }
     }
 
-    private LineResult mergeLine(int[] originalLine) {
-        int[] compactedValues = new int[originalLine.length];
+    private boolean isObstacleAt(
+            int lineIndex,
+            int offset,
+            Direction direction
+    ) {
+        Position position =
+                positionAt(
+                        lineIndex,
+                        offset,
+                        direction
+                );
+
+        return board.isObstacle(
+                position.row(),
+                position.column()
+        );
+    }
+
+    /**
+     * Converts a line and offset into a board position
+     *
+     * <p>The returned positions are ordered from the destination edge
+     * of the movement toward the opposite edge
+     */
+    private Position positionAt(
+            int lineIndex,
+            int offset,
+            Direction direction
+    ) {
+        int size = board.getSize();
+
+        return switch (direction) {
+            case LEFT -> new Position(lineIndex, offset);
+
+            case RIGHT -> new Position(
+                    lineIndex,
+                    size - 1 - offset
+            );
+
+            case UP -> new Position(offset, lineIndex);
+
+            case DOWN -> new Position(
+                    size - 1 - offset,
+                    lineIndex
+            );
+        };
+    }
+
+    /**
+     * Compacts and merges the values in one playable segment
+     */
+    private LineResult mergeLine(
+            int[] originalValues
+    ) {
+        int[] compactedValues =
+                new int[originalValues.length];
+
         int valueCount = 0;
 
-        for (int value : originalLine) {
+        for (int value : originalValues) {
             if (value != 0) {
                 compactedValues[valueCount] = value;
                 valueCount++;
             }
         }
 
-        int[] mergedValues = new int[originalLine.length];
+        int[] mergedValues =
+                new int[originalValues.length];
+
         int outputIndex = 0;
         int scoreGained = 0;
 
@@ -194,10 +341,12 @@ public final class GameEngine {
              inputIndex < valueCount;
              inputIndex++) {
 
-            int value = compactedValues[inputIndex];
+            int value =
+                    compactedValues[inputIndex];
 
             if (inputIndex + 1 < valueCount
-                    && value == compactedValues[inputIndex + 1]) {
+                    && value
+                    == compactedValues[inputIndex + 1]) {
 
                 value *= 2;
                 scoreGained += value;
@@ -208,12 +357,16 @@ public final class GameEngine {
             outputIndex++;
         }
 
-        return new LineResult(mergedValues, scoreGained);
+        return new LineResult(
+                mergedValues,
+                scoreGained
+        );
     }
 
     private static void validateTarget(int target) {
         boolean isPowerOfTwo =
-                target > 0 && (target & (target - 1)) == 0;
+                target > 0
+                        && (target & (target - 1)) == 0;
 
         if (!isPowerOfTwo) {
             throw new IllegalArgumentException(
@@ -223,11 +376,20 @@ public final class GameEngine {
     }
 
     /**
-     * Internal result created while processing one row or column
-     *
-     * @param values      processed line values
-     * @param scoreGained score gained from merges in the line
+     * Result from processing one row or column
      */
-    private record LineResult(int[] values, int scoreGained) {
+    private record SegmentResult(
+            boolean moved,
+            int scoreGained
+    ) {
+    }
+
+    /**
+     * Result from merging one playable segment
+     */
+    private record LineResult(
+            int[] values,
+            int scoreGained
+    ) {
     }
 }
