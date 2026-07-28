@@ -4,12 +4,14 @@ import com.example.demo.ai.HintService;
 import com.example.demo.engine.GameEngine;
 import com.example.demo.engine.TileSpawner;
 import com.example.demo.history.GameHistory;
+import com.example.demo.level.LevelConfig;
 import com.example.demo.model.Board;
 import com.example.demo.model.Direction;
 import com.example.demo.model.GameState;
 import com.example.demo.model.MoveResult;
 import javafx.scene.Group;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.input.KeyCode;
 import javafx.scene.text.Font;
@@ -17,18 +19,17 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
 /**
- * Connects the JavaFX game interface to the independent game engine.
+ * Connects the JavaFX interface to the independent game engine.
  */
 class GameScene {
 
-    private static final int HEIGHT = 700;
+    private static final int BOARD_AREA_SIZE = 700;
     private static final int DISTANCE_BETWEEN_CELLS = 10;
 
-    private static int n = 4;
+    private static int boardSize = 4;
 
-    private static double LENGTH =
-            (HEIGHT - ((n + 1) * DISTANCE_BETWEEN_CELLS))
-                    / (double) n;
+    private static double cellLength =
+            calculateCellLength(boardSize);
 
     private final TextMaker textMaker =
             TextMaker.getSingleInstance();
@@ -47,35 +48,48 @@ class GameScene {
     private Group boardRoot;
 
     private long score;
+    private boolean targetMessageShown;
 
     static void setN(int number) {
-        n = number;
-
-        LENGTH =
-                (HEIGHT - ((n + 1) * DISTANCE_BETWEEN_CELLS))
-                        / (double) n;
+        boardSize = number;
+        cellLength = calculateCellLength(number);
     }
 
     static double getLENGTH() {
-        return LENGTH;
+        return cellLength;
+    }
+
+    private static double calculateCellLength(int size) {
+        return (
+                BOARD_AREA_SIZE
+                        - ((size + 1) * DISTANCE_BETWEEN_CELLS)
+        ) / (double) size;
     }
 
     /**
-     * Creates a new empty board and places the first two tiles.
+     * Creates a fresh game using the selected level configuration.
      */
-    private void initialiseGame() {
-        board = new Board(n);
+    private void initialiseGame(LevelConfig levelConfig) {
+        setN(levelConfig.boardSize());
+
+        board = new Board(levelConfig.boardSize());
         gameEngine = new GameEngine(board);
+
         score = 0;
+        targetMessageShown = false;
 
         gameHistory.clear();
 
-        tileSpawner.spawn(board);
-        tileSpawner.spawn(board);
+        for (int tile = 0;
+             tile < levelConfig.startingTileCount();
+             tile++) {
+
+            tileSpawner.spawn(board);
+        }
     }
 
     /**
-     * Recreates the visible board from the numerical board model.
+     * Recreates the JavaFX cells from the numerical board.
      */
     private void renderBoard() {
         boardRoot.getChildren().clear();
@@ -86,19 +100,19 @@ class GameScene {
                  column++) {
 
                 double x =
-                        column * LENGTH
+                        column * cellLength
                                 + (column + 1)
                                 * DISTANCE_BETWEEN_CELLS;
 
                 double y =
-                        row * LENGTH
+                        row * cellLength
                                 + (row + 1)
                                 * DISTANCE_BETWEEN_CELLS;
 
                 Cell cell = new Cell(
                         x,
                         y,
-                        LENGTH,
+                        cellLength,
                         boardRoot
                 );
 
@@ -120,12 +134,6 @@ class GameScene {
         }
     }
 
-    /**
-     * Converts a JavaFX key code to a game direction.
-     *
-     * @param keyCode pressed keyboard key
-     * @return movement direction, or null for a non-direction key
-     */
     private Direction convertDirection(KeyCode keyCode) {
         return switch (keyCode) {
             case UP -> Direction.UP;
@@ -137,16 +145,77 @@ class GameScene {
     }
 
     /**
+     * Updates the visible level-progress message.
+     */
+    private void updateTargetStatus(
+            LevelConfig levelConfig,
+            Text statusText
+    ) {
+        if (gameEngine.hasReachedTarget(
+                levelConfig.targetTile()
+        )) {
+            statusText.setText("Target reached!");
+        } else {
+            statusText.setText(
+                    "Reach " + levelConfig.targetTile()
+            );
+
+            targetMessageShown = false;
+        }
+    }
+
+    /**
+     * Displays a message the first time the level target is reached.
+     */
+    private void checkTargetReached(
+            LevelConfig levelConfig,
+            Text statusText,
+            Stage primaryStage
+    ) {
+        boolean targetReached =
+                gameEngine.hasReachedTarget(
+                        levelConfig.targetTile()
+                );
+
+        if (!targetReached) {
+            return;
+        }
+
+        statusText.setText("Target reached!");
+
+        if (targetMessageShown) {
+            return;
+        }
+
+        targetMessageShown = true;
+
+        Alert alert =
+                new Alert(Alert.AlertType.INFORMATION);
+
+        alert.initOwner(primaryStage);
+        alert.setTitle("Level Complete");
+        alert.setHeaderText(
+                levelConfig.name() + " completed"
+        );
+        alert.setContentText(
+                "You reached the "
+                        + levelConfig.targetTile()
+                        + " tile.\n"
+                        + "You may continue playing."
+        );
+
+        alert.showAndWait();
+    }
+
+    /**
      * Restores the most recently saved board and score.
-     *
-     * @param scoreText visible score display
-     * @param undoButton Undo button
-     * @param hintText visible hint display
      */
     private void undoLastMove(
             Text scoreText,
             Button undoButton,
-            Text hintText
+            Text hintText,
+            Text statusText,
+            LevelConfig levelConfig
     ) {
         gameHistory.undo().ifPresent(savedState -> {
             board = savedState.board();
@@ -155,14 +224,22 @@ class GameScene {
 
             scoreText.setText(Long.toString(score));
             hintText.setText("Hint: -");
+
+            updateTargetStatus(
+                    levelConfig,
+                    statusText
+            );
+
             renderBoard();
         });
 
-        undoButton.setDisable(!gameHistory.canUndo());
+        undoButton.setDisable(
+                !gameHistory.canUndo()
+        );
     }
 
     /**
-     * Displays the existing end-game scene.
+     * Displays the existing game-over scene.
      */
     private void showEndGame(
             Scene endGameScene,
@@ -184,56 +261,107 @@ class GameScene {
         score = 0;
     }
 
+    /**
+     * Creates and starts the selected playable level.
+     */
     void game(
             Scene gameScene,
             Group root,
             Stage primaryStage,
             Scene endGameScene,
-            Group endGameRoot
+            Group endGameRoot,
+            Scene menuScene,
+            LevelConfig levelConfig
     ) {
         root.getChildren().clear();
 
         boardRoot = new Group();
         root.getChildren().add(boardRoot);
 
-        Text scoreLabel = new Text("SCORE :");
-        scoreLabel.setFont(Font.font(30));
-        scoreLabel.relocate(750, 100);
+        Text levelNameText =
+                new Text(levelConfig.name());
+
+        levelNameText.setFont(Font.font(25));
+        levelNameText.relocate(720, 35);
+        root.getChildren().add(levelNameText);
+
+        Text boardDetailsText =
+                new Text(
+                        levelConfig.boardSize()
+                                + " × "
+                                + levelConfig.boardSize()
+                                + " | Target "
+                                + levelConfig.targetTile()
+                );
+
+        boardDetailsText.setFont(Font.font(15));
+        boardDetailsText.relocate(720, 75);
+        root.getChildren().add(boardDetailsText);
+
+        Text scoreLabel = new Text("SCORE");
+        scoreLabel.setFont(Font.font(27));
+        scoreLabel.relocate(735, 115);
         root.getChildren().add(scoreLabel);
 
         Text scoreText = new Text("0");
-        scoreText.setFont(Font.font(20));
-        scoreText.relocate(750, 150);
+        scoreText.setFont(Font.font(22));
+        scoreText.relocate(735, 155);
         root.getChildren().add(scoreText);
 
         Button undoButton = new Button("Undo");
-        undoButton.setLayoutX(735);
-        undoButton.setLayoutY(210);
-        undoButton.setPrefWidth(110);
+        undoButton.setLayoutX(730);
+        undoButton.setLayoutY(205);
+        undoButton.setPrefWidth(120);
         undoButton.setDisable(true);
         undoButton.setFocusTraversable(false);
         root.getChildren().add(undoButton);
 
         Button hintButton = new Button("Hint");
-        hintButton.setLayoutX(735);
-        hintButton.setLayoutY(260);
-        hintButton.setPrefWidth(110);
+        hintButton.setLayoutX(730);
+        hintButton.setLayoutY(250);
+        hintButton.setPrefWidth(120);
         hintButton.setFocusTraversable(false);
         root.getChildren().add(hintButton);
 
+        Button restartButton = new Button("Restart");
+        restartButton.setLayoutX(730);
+        restartButton.setLayoutY(295);
+        restartButton.setPrefWidth(120);
+        restartButton.setFocusTraversable(false);
+        root.getChildren().add(restartButton);
+
+        Button levelsButton = new Button("Level Menu");
+        levelsButton.setLayoutX(730);
+        levelsButton.setLayoutY(340);
+        levelsButton.setPrefWidth(120);
+        levelsButton.setFocusTraversable(false);
+        root.getChildren().add(levelsButton);
+
         Text hintText = new Text("Hint: -");
         hintText.setFont(Font.font(18));
-        hintText.relocate(720, 320);
+        hintText.relocate(720, 410);
         root.getChildren().add(hintText);
 
-        initialiseGame();
+        Text statusText =
+                new Text(
+                        "Reach "
+                                + levelConfig.targetTile()
+                );
+
+        statusText.setFont(Font.font(18));
+        statusText.relocate(720, 455);
+        root.getChildren().add(statusText);
+
+        initialiseGame(levelConfig);
         renderBoard();
 
         undoButton.setOnAction(event ->
                 undoLastMove(
                         scoreText,
                         undoButton,
-                        hintText
+                        hintText,
+                        statusText,
+                        levelConfig
                 )
         );
 
@@ -242,7 +370,8 @@ class GameScene {
                         .ifPresentOrElse(
                                 direction ->
                                         hintText.setText(
-                                                "Hint: " + direction
+                                                "Hint: "
+                                                        + direction
                                         ),
                                 () ->
                                         hintText.setText(
@@ -251,35 +380,44 @@ class GameScene {
                         )
         );
 
-        /*
-         * setOnKeyPressed replaces the previous handler instead of
-         * adding another handler whenever a new game is started.
-         */
+        restartButton.setOnAction(event -> {
+            initialiseGame(levelConfig);
+            renderBoard();
+
+            scoreText.setText("0");
+            hintText.setText("Hint: -");
+            statusText.setText(
+                    "Reach "
+                            + levelConfig.targetTile()
+            );
+
+            undoButton.setDisable(true);
+            gameScene.getRoot().requestFocus();
+        });
+
+        levelsButton.setOnAction(event -> {
+            gameScene.setOnKeyPressed(null);
+            gameHistory.clear();
+
+            primaryStage.setScene(menuScene);
+        });
+
         gameScene.setOnKeyPressed(keyEvent -> {
             Direction direction =
-                    convertDirection(keyEvent.getCode());
+                    convertDirection(
+                            keyEvent.getCode()
+                    );
 
-            /*
-             * Ignore letters, Space, Enter and all other
-             * non-direction keys.
-             */
             if (direction == null) {
                 return;
             }
 
-            /*
-             * Capture the board and score before attempting the move.
-             * The snapshot is only saved if the move is valid.
-             */
             GameState previousState =
                     new GameState(board, score);
 
             MoveResult moveResult =
                     gameEngine.move(direction);
 
-            /*
-             * Invalid moves are not added to the Undo history.
-             */
             if (!moveResult.moved()) {
                 return;
             }
@@ -289,10 +427,18 @@ class GameScene {
             hintText.setText("Hint: -");
 
             score += moveResult.scoreGained();
-            scoreText.setText(Long.toString(score));
+            scoreText.setText(
+                    Long.toString(score)
+            );
 
             tileSpawner.spawn(board);
             renderBoard();
+
+            checkTargetReached(
+                    levelConfig,
+                    statusText,
+                    primaryStage
+            );
 
             if (gameEngine.isGameOver()) {
                 showEndGame(
