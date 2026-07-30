@@ -11,9 +11,12 @@ import java.util.Set;
  *
  * <p>The board may contain obstacle positions that cannot store tiles
  * This class contains no JavaFX code, allowing it to be tested
- * independently from the graphical interface.</p>
+ * independentally from the graphical interface.</p>
  */
 public final class Board {
+    /**
+     * Default number of rows and columns used by a classic board.
+     */
 
     public static final int DEFAULT_SIZE = 4;
 

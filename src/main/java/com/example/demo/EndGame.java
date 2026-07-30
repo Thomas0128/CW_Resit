@@ -14,18 +14,36 @@ import javafx.stage.Stage;
 
 import java.util.Optional;
 
-
+/**
+ * Displays the legacy game-over screen and final score
+ *
+ * <p>The screen manager is implemented as a singleton so that the
+ * application uses one shared instance.</p>
+ */
 public class EndGame {
     private static EndGame singleInstance = null;
     private EndGame(){
 
     }
+    /**
+     * Returns the shared end-game screen manager
+     *
+     * @return singleton {@code EndGame} instance
+     */
     public static EndGame getInstance(){
         if(singleInstance == null)
             singleInstance= new EndGame();
         return singleInstance;
     }
 
+    /**
+     * Populates and displays the game-over interface
+     *
+     * @param endGameScene scene associated with the game-over screen
+     * @param root group that receives the game-over controls
+     * @param primaryStage primary application window
+     * @param score final score achieved by the player
+     */
     public void endGameShow(Scene endGameScene, Group root, Stage primaryStage,long score){
         Text text = new Text("GAME OVER");
         text.relocate(250,250);

@@ -56,6 +56,12 @@ class GameScene {
     private boolean targetMessageShown;
 
     /**
+     * Creates a game scene controller.
+     */
+    GameScene() {
+    }
+
+    /**
      * Updates the board size used by the JavaFX interface.
      *
      * @param number board width and height
