@@ -24,7 +24,12 @@ public record LevelConfig(
 ) {
 
     /**
-     * Creates a level without obstacles
+     * Creates a level without obstacle positions.
+     *
+     * @param name human-readable level name
+     * @param boardSize number of rows and columns
+     * @param targetTile tile required to complete the level
+     * @param startingTileCount number of tiles placed at the start
      */
     public LevelConfig(
             String name,

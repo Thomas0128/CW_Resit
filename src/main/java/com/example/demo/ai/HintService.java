@@ -35,6 +35,12 @@ public final class HintService {
     private static final int CORNER_WEIGHT = 2;
 
     /**
+     * Creates a hint service.
+     */
+    public HintService() {
+    }
+
+    /**
      * Suggests the highest-scoring valid direction.
      *
      * @param board current game board
@@ -88,6 +94,10 @@ public final class HintService {
      * tile. The board model supplies the number of usable empty
      * cells, so obstacle positions are not incorrectly rewarded
      * as empty spaces.</p>
+     *
+     * @param board simulated board after a move
+     * @param scoreGained score produced by the simulated move
+     * @return heuristic evaluation score
      */
     private long evaluateBoard(
             Board board,
@@ -144,6 +154,11 @@ public final class HintService {
 
     /**
      * Checks whether a position is one of the four board corners.
+     *
+     * @param row board row
+     * @param column board column
+     * @param boardSize number of rows and columns
+     * @return {@code true} when the position is a corner
      */
     private boolean isCorner(
             int row,

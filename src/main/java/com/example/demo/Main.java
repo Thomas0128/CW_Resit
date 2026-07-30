@@ -18,9 +18,27 @@ import javafx.stage.Stage;
  */
 public class Main extends Application {
 
+    /**
+     * Width of the application window in pixels.
+     */
     static final int WIDTH = 900;
+
+    /**
+     * Height of the application window in pixels.
+     */
     static final int HEIGHT = 900;
 
+    /**
+     * Creates the main JavaFX application.
+     */
+    public Main() {
+    }
+
+    /**
+     * Creates and displays the JavaFX application interface.
+     *
+     * @param primaryStage main application stage
+     */
     @Override
     public void start(Stage primaryStage) {
 
@@ -139,6 +157,17 @@ public class Main extends Application {
 
     /**
      * Creates a button that starts the supplied level.
+     *
+     * @param buttonText text displayed by the button
+     * @param levelConfig level started by the button
+     * @param game game scene controller
+     * @param gameScene playable game scene
+     * @param gameRoot playable game root
+     * @param primaryStage main application stage
+     * @param endGameScene game-over scene
+     * @param endGameRoot game-over root
+     * @param menuScene level-selection scene
+     * @return configured level-selection button
      */
     private Button createLevelButton(
             String buttonText,
@@ -175,6 +204,11 @@ public class Main extends Application {
         return button;
     }
 
+    /**
+     * Launches the JavaFX application.
+     *
+     * @param args command-line arguments
+     */
     public static void main(String[] args) {
         launch(args);
     }
